@@ -11,10 +11,10 @@
                 <p class="header_link">Contact</p>
             </div>
             <div class="d-flex align-items-center">
-                <div v-if="currentAccount" class="header_img position-relative">
+                <div v-if="currentAddress" class="header_img position-relative">
                     <div v-on:click="account_option = !account_option">
                         <img src="../assets/images/user.png" alt="" class="me-1">
-                        <span>{{ TrimAddress(currentAccount, 7) }}</span>
+                        <span>{{ trimAddress(currentAddress, 7) }}</span>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                             class="bi bi-caret-down-fill" viewBox="0 0 16 16">
                             <path
@@ -22,7 +22,7 @@
                         </svg>
                     </div>
                     <div v-if="account_option" class="header_img_drop position-absolute shadow-sm">
-                        <p v-on:click="DisconnectWallet()" class="header_link">Settings</p>
+                        <p v-on:click="" class="header_link">Settings</p>
                     </div>
                 </div>
                 <button v-else v-on:click="ConnectWallet()" type="button" class="header_btn">Connect</button>
@@ -31,6 +31,32 @@
     </header>
 
     <div class="container banner_con d-flex justify-content-center">
+        <div class="col-6 banner_cont position-relative shadow">
+            <h1 class="banner_header">Tranfer Ethers</h1>
+
+            <form method="post" v-on:submit.prevent="MakeTransfer()" class="">
+                <p class="banner_error">{{ transfer_error }}</p>
+                <input v-model="transfer_address" type="text" class="banner_box shadow-sm mb-4"
+                    placeholder="Enter ETH address" required>
+                <input v-model="transfer_amount" type="text" class="banner_box shadow-sm mb-4"
+                    placeholder="Enter ETH value" required>
+                <p class="banner_result d-flex justify-content-center align-items-center">Balance: <span class="ms-2">{{
+                        transfer_balance
+                }} ETH</span></p>
+                <div class="d-flex justify-content-center">
+                    <button type="submit" class="banner_btn">Process</button>
+                </div>
+            </form>
+            <div v-if="loading"
+                class="banner_loading d-flex justify-content-center align-items-center position-absolute">
+                <div class="spinner-border text-light" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="false" class="container banner_con d-flex justify-content-center">
         <div class="col-6 banner_cont position-relative shadow">
             <h1 class="banner_header">Check Balance</h1>
 
@@ -55,20 +81,29 @@
     </div>
 
 
-
 </template>
 
 
 <script>
 import { ethers } from "ethers";
 const provider = window.ethereum ? new ethers.providers.Web3Provider(window.ethereum) : null;
+const signer = provider.getSigner();
+
+const ContractAddress = '';
+const ContractABI = [];
+const Lock = new ethers.Contract(ContractAddress, ContractABI, signer);
 
 export default {
     data() {
         return {
             currentAccount: null,
             currentContract: null,
-            contractAddress: null,
+            currentAddress: null,
+
+            transfer_address: null,
+            transfer_amount: null,
+            transfer_balance: 0,
+            transfer_error: null,
 
             account_option: false,
             account_address: null,
@@ -80,6 +115,20 @@ export default {
     },
 
     methods: {
+        async IsConnected() {
+            if (window.ethereum) {
+                await ethereum.request({ method: 'eth_accounts' }).then((res) => {
+                    if (res.length !== 0) {
+                        this.currentAddress = res[0];
+                    }
+                }).catch((error) => {
+                    console.log(error);
+                })
+
+            }
+
+        },
+
         async ConnectWallet() {
 
             if (!window.ethereum) {
@@ -89,15 +138,11 @@ export default {
             // Connect to an account
             await provider.send("eth_requestAccounts", []).then((res) => {
                 if (res.length !== 0) {
-                    this.currentAccount = res[0];
+                    this.currentAddress = res[0];
                 }
             }).catch((error) => {
                 alert(error.message);
             });
-
-        },
-
-        DisconnectWallet() {
 
         },
 
@@ -114,17 +159,66 @@ export default {
             });
         },
 
-        TrimAddress(word, to) {
+        async MakeTransfer() {
+            this.loading = true;
+            this.transfer_error = null;
+            if (this.transfer_balance >= this.transfer_amount) {
+                await signer.sendTransaction({
+                    to: this.transfer_address,
+                    value: this.toWei(this.transfer_amount),
+                }).then((res) => {
+                    this.loading = false;
+                    this.transfer_address = null;
+                    this.transfer_amount = null;
+                    console.log(res);
+                }).catch((error) => {
+                    this.loading = false;
+                    this.transfer_error = error.message
+                    console.log(error);
+                })
+            }
+            else {
+                this.loading = false;
+                this.transfer_error = "Insuffient Balance";
+            }
+        },
+
+        toEther(amount) {
+            return ethers.utils.formatEther(amount);
+        },
+        toWei(amount) {
+            return ethers.utils.parseEther(amount);
+        },
+
+        trimAddress(word, to) {
             return word.slice(0, to) + '...';
         }
     },
 
     computed: {
 
+        async AccountBalance() {
+            if (this.currentAddress) {
+                this.loading = true;
+                this.transfer_error = null;
+                this.transfer_balance = 0;
+                await signer.getBalance().then((res) => {
+                    this.loading = false;
+                    this.transfer_balance = ethers.utils.formatEther(res);
+                }).catch((error) => {
+                    this.loading = false;
+                    this.transfer_error = error.message;
+                });
+            }
+        },
+
+
+
     },
 
     mounted() {
-        // this.ConnectWallet();
+        this.IsConnected();
+
     }
 
 
