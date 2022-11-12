@@ -31,8 +31,8 @@
     </header>
 
     <div class="container banner_con d-flex justify-content-center">
-        <div class="col-6 banner_cont position-relative shadow">
-            <h1 class="banner_header">Tranfer Ethers</h1>
+        <div class="col banner_cont position-relative shadow me-5">
+            <h1 class="banner_header">Transfer Ethers</h1>
 
             <form method="post" v-on:submit.prevent="MakeTransfer()" class="">
                 <p class="banner_error">{{ transfer_error }}</p>
@@ -47,17 +47,14 @@
                     <button type="submit" class="banner_btn">Process</button>
                 </div>
             </form>
-            <div v-if="loading"
+            <div v-if="transfer_loading"
                 class="banner_loading d-flex justify-content-center align-items-center position-absolute">
                 <div class="spinner-border text-light" role="status">
                     <span class="visually-hidden">Loading...</span>
                 </div>
             </div>
         </div>
-    </div>
-
-    <div v-if="false" class="container banner_con d-flex justify-content-center">
-        <div class="col-6 banner_cont position-relative shadow">
+        <div class="col banner_cont position-relative shadow">
             <h1 class="banner_header">Check Balance</h1>
 
             <form method="post" v-on:submit.prevent="GetBalance()" class="">
@@ -79,6 +76,7 @@
             </div>
         </div>
     </div>
+
 
 
 </template>
@@ -110,6 +108,7 @@ export default {
             account_balance: 0,
             account_error: null,
 
+            transfer_loading: false,
             loading: false,
         }
     },
@@ -160,26 +159,41 @@ export default {
         },
 
         async MakeTransfer() {
-            this.loading = true;
+            this.transfer_loading = true;
             this.transfer_error = null;
             if (this.transfer_balance >= this.transfer_amount) {
                 await signer.sendTransaction({
                     to: this.transfer_address,
                     value: this.toWei(this.transfer_amount),
                 }).then((res) => {
-                    this.loading = false;
+                    this.transfer_loading = false;
                     this.transfer_address = null;
                     this.transfer_amount = null;
-                    console.log(res);
+                    this.AccountBalance();
                 }).catch((error) => {
-                    this.loading = false;
+                    this.transfer_loading = false;
                     this.transfer_error = error.message
                     console.log(error);
                 })
             }
             else {
-                this.loading = false;
+                this.transfer_loading = false;
                 this.transfer_error = "Insuffient Balance";
+            }
+        },
+
+        async AccountBalance() {
+            if (this.currentAddress != null) {
+                this.transfer_loading = true;
+                this.transfer_error = null;
+                this.transfer_balance = 0;
+                await signer.getBalance().then((res) => {
+                    this.transfer_loading = false;
+                    this.transfer_balance = ethers.utils.formatEther(res);
+                }).catch((error) => {
+                    this.transfer_loading = false;
+                    this.transfer_error = error.message;
+                });
             }
         },
 
@@ -196,28 +210,12 @@ export default {
     },
 
     computed: {
-
-        async AccountBalance() {
-            if (this.currentAddress) {
-                this.loading = true;
-                this.transfer_error = null;
-                this.transfer_balance = 0;
-                await signer.getBalance().then((res) => {
-                    this.loading = false;
-                    this.transfer_balance = ethers.utils.formatEther(res);
-                }).catch((error) => {
-                    this.loading = false;
-                    this.transfer_error = error.message;
-                });
-            }
-        },
-
-
-
+        //
     },
 
     mounted() {
         this.IsConnected();
+        setTimeout(this.AccountBalance, 3000);
 
     }
 
